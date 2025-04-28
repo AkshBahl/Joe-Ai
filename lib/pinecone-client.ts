@@ -29,7 +29,7 @@ export async function getPineconeIndex(indexName = process.env.PINECONE_INDEX_NA
 // Helper function to check if index exists and create it if it doesn't
 export async function ensurePineconeIndex(
   indexName = process.env.PINECONE_INDEX_NAME || "custom-gpt-knowledge",
-  dimension = 1536,
+  dimension = 1024,
 ) {
   const pinecone = await getPineconeClient()
 
@@ -48,7 +48,7 @@ export async function ensurePineconeIndex(
 
       await pinecone.createIndex({
         name: indexName,
-        dimension: dimension,
+        dimension: 1024,
         metric: "cosine",
         spec: {
           serverless: {

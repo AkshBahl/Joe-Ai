@@ -93,6 +93,7 @@ export default function ChatPage() {
   }
 
   return (
+    
     <div className="container mx-auto py-6 px-4 h-screen flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">Chat with Custom GPT</h1>

@@ -18,8 +18,9 @@ export async function createEmbedding(text: string) {
   const openai = getOpenAIClient()
 
   const response = await openai.embeddings.create({
-    model: "text-embedding-ada-002",
+    model: "text-embedding-3-large",
     input: text,
+    dimensions: 1024,
   })
 
   return response.data[0].embedding

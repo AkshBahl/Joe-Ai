@@ -52,7 +52,7 @@ export function useChat() {
           },
           body: JSON.stringify({
             messages: [...messages, userMessage],
-            vectorRatio: metadata?.vectorRatio || 75,
+            vectorRatio: metadata?.vectorRatio ,
             summaryLength: metadata?.summaryLength || "none",
           }),
         })
