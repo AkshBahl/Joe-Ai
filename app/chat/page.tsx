@@ -1,18 +1,40 @@
 "use client"
 
-import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Slider } from "@/components/ui/slider"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useChat } from "@/hooks/use-chat"
 import ChatMessage from "@/components/chat-message"
-import { Send, Settings, Loader2, Database } from "lucide-react"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Send,
+  Settings,
+  Loader2,
+  Database,
+  Mic,
+  MicOff,
+  Sun,
+  Moon,
+} from "lucide-react"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
+import { useTheme } from "next-themes"
 
 export default function ChatPage() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat()
@@ -22,21 +44,16 @@ export default function ChatPage() {
   const [testingPinecone, setTestingPinecone] = useState(false)
   const { toast } = useToast()
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { theme, setTheme } = useTheme()
+  const [isListening, setIsListening] = useState(false)
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
   const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-
-    // Add the settings to the message metadata
-    const metadata = {
-      vectorRatio,
-      summaryLength,
-    }
-
+    const metadata = { vectorRatio, summaryLength }
     handleSubmit(e, metadata)
   }
 
@@ -45,8 +62,7 @@ export default function ChatPage() {
     try {
       const response = await fetch("/api/test-connections?type=openai")
       const data = await response.json()
-
-      if (data.openai && data.openai.success) {
+      if (data.openai?.success) {
         toast({
           title: "OpenAI API Test Successful",
           description: `OpenAI API is working. Response: "${data.openai.response}"`,
@@ -55,7 +71,6 @@ export default function ChatPage() {
         throw new Error(data.openai?.error || "Unknown error occurred")
       }
     } catch (error: any) {
-      console.error("Error testing OpenAI API:", error)
       toast({
         title: "OpenAI API Test Failed",
         description: error.message || "Unknown error occurred",
@@ -71,8 +86,7 @@ export default function ChatPage() {
     try {
       const response = await fetch("/api/test-connections?type=pinecone")
       const data = await response.json()
-
-      if (data.pinecone && data.pinecone.success) {
+      if (data.pinecone?.success) {
         toast({
           title: "Pinecone API Test Successful",
           description: `Pinecone API is working. Available indexes: ${data.pinecone.indexes.join(", ") || "none"}`,
@@ -81,7 +95,6 @@ export default function ChatPage() {
         throw new Error(data.pinecone?.error || "Unknown error occurred")
       }
     } catch (error: any) {
-      console.error("Error testing Pinecone API:", error)
       toast({
         title: "Pinecone API Test Failed",
         description: error.message || "Unknown error occurred",
@@ -92,110 +105,178 @@ export default function ChatPage() {
     }
   }
 
+  // Speech-to-text logic
+  const startListening = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in this browser.')
+      return
+    }
+    const recognition = new (window as any).webkitSpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.onstart = () => setIsListening(true)
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results)
+        .map((result: any) => result[0])
+        .map((result: any) => result.transcript)
+        .join('')
+      handleInputChange({ target: { value: transcript } } as any)
+    }
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+    recognition.start()
+  }
+  const stopListening = () => setIsListening(false)
+
   return (
-    
-    <div className="container mx-auto py-6 px-4 h-screen flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Chat with Custom GPT</h1>
-
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleTestOpenAIAPI} disabled={testingOpenAI}>
-            {testingOpenAI ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-            Test OpenAI
-          </Button>
-
-          <Button variant="outline" size="sm" onClick={handleTestPineconeAPI} disabled={testingPinecone}>
-            {testingPinecone ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Database className="h-4 w-4 mr-2" />
-            )}
-            Test Pinecone
-          </Button>
-
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent>
-              <SheetHeader>
-                <SheetTitle>Chat Settings</SheetTitle>
-                <SheetDescription>Customize how your AI assistant responds</SheetDescription>
-              </SheetHeader>
-              <div className="py-4 space-y-6">
-                <div className="space-y-2">
-                  <Label>
-                    Vector Search vs Web Search: {vectorRatio}% / {100 - vectorRatio}%
-                  </Label>
-                  <Slider
-                    value={[vectorRatio]}
-                    onValueChange={(value) => setVectorRatio(value[0])}
-                    min={0}
-                    max={100}
-                    step={5}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Summary Length</Label>
-                  <Select value={summaryLength} onValueChange={setSummaryLength}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="No summarization" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No summarization</SelectItem>
-                      <SelectItem value="100">100 words</SelectItem>
-                      <SelectItem value="200">200 words</SelectItem>
-                      <SelectItem value="300">300 words</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
+    <div className="flex h-screen w-screen bg-background text-foreground">
+      {/* Left Panel - Image */}
+      <div className="w-3/4 flex items-center justify-center bg-background">
+        <img
+          src="/joe-avatar.png"
+          alt="Joe Avatar"
+          className="w-full h-full object-contain"
+        />
       </div>
 
-      <Card className="flex-1 overflow-hidden flex flex-col">
-        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center text-center p-8">
-              <div className="max-w-md space-y-2">
-                <h3 className="text-lg font-medium">Welcome to your Custom GPT</h3>
-                <p className="text-muted-foreground">
-                  Start chatting with your AI assistant powered by your custom knowledge base. Use the settings button
-                  to adjust how the AI responds.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <>
-              {messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
-              ))}
-              <div ref={messagesEndRef} />
-            </>
-          )}
-        </CardContent>
-
-        <div className="p-4 border-t">
-          <form onSubmit={handleSendMessage} className="flex gap-2">
-            <Input
-              value={input}
-              onChange={handleInputChange}
-              placeholder="Type your message..."
-              disabled={isLoading}
-              className="flex-1"
-            />
-            <Button type="submit" disabled={isLoading || !input.trim()}>
-              {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-              Send
+      {/* Right Panel - Chat UI */}
+      <div className="w-1/2 flex flex-col p-4 overflow-hidden bg-background text-foreground">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleTestOpenAIAPI}
+              disabled={testingOpenAI}
+              className="text-foreground bg-muted"
+            >
+              {testingOpenAI ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Test OpenAI
             </Button>
-          </form>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleTestPineconeAPI}
+              disabled={testingPinecone}
+              className="text-foreground bg-muted"
+            >
+              {testingPinecone ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Database className="h-4 w-4 mr-2" />
+              )}
+              Test Pinecone
+            </Button>
+          </div>
+          <div className="flex gap-2 items-center">
+            {/* Theme toggle button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="text-foreground bg-muted"
+            >
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
+            {/* Settings button */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-foreground bg-muted">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="bg-background text-foreground">
+                <SheetHeader>
+                  <SheetTitle>Chat Settings</SheetTitle>
+                  <SheetDescription>Customize how your AI assistant responds</SheetDescription>
+                </SheetHeader>
+                <div className="py-4 space-y-6">
+                  <div className="space-y-2">
+                    <Label>
+                      Vector vs Web Search: {vectorRatio}% / {100 - vectorRatio}%
+                    </Label>
+                    <Slider
+                      value={[vectorRatio]}
+                      onValueChange={(value) => setVectorRatio(value[0])}
+                      min={0}
+                      max={100}
+                      step={5}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Summary Length</Label>
+                    <Select value={summaryLength} onValueChange={setSummaryLength}>
+                      <SelectTrigger className="bg-background text-foreground">
+                        <SelectValue placeholder="No summarization" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background text-foreground">
+                        <SelectItem value="none">No summarization</SelectItem>
+                        <SelectItem value="100">100 words</SelectItem>
+                        <SelectItem value="200">200 words</SelectItem>
+                        <SelectItem value="300">300 words</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
-      </Card>
+
+        <Card className="flex-1 overflow-hidden flex flex-col border border-gray-300 dark:border-gray-700 bg-background text-foreground">
+          <CardContent className="flex-1 overflow-y-auto p-2 space-y-4">
+            {messages.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-center px-4">
+                <div className="max-w-sm space-y-2">
+                  <h3 className="text-sm font-medium">Welcome to Joe AI</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Start chatting with your assistant powered by your custom knowledge base.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {messages.map((message) => (
+                  <ChatMessage key={message.id} message={message} />
+                ))}
+                <div ref={messagesEndRef} />
+              </>
+            )}
+          </CardContent>
+
+          <div className="p-2 border-t border-gray-300 dark:border-gray-700 bg-background">
+            <form onSubmit={handleSendMessage} className="flex gap-2">
+              {/* Mic button for speech-to-text */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={isListening ? stopListening : startListening}
+                className="text-foreground bg-muted"
+              >
+                {isListening ? <MicOff className="h-5 w-5 animate-pulse" /> : <Mic className="h-5 w-5" />}
+              </Button>
+              <Input
+                value={input}
+                onChange={handleInputChange}
+                placeholder="Type your message..."
+                disabled={isLoading}
+                className="flex-1 text-xs text-foreground border border-gray-300 dark:border-gray-700 placeholder-muted-foreground bg-background"
+              />
+              <Button
+                type="submit"
+                disabled={isLoading || !input.trim()}
+                size="sm"
+                className="text-background bg-foreground"
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </form>
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }

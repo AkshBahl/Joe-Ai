@@ -15,7 +15,7 @@ async function queryPinecone(query: string, vectorRatio = 75) {
     const index = pinecone.index(indexName)
 
     // Always use topK = 3 regardless of ratio
-    const topK = 3
+    const topK = 10
     const queryResponse = await index.query({
       vector: embedding,
       topK,

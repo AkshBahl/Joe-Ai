@@ -18,18 +18,17 @@ export async function DELETE(req: NextRequest) {
     // Create a zero vector with the correct dimension
     const zeroVector = new Array(indexDimension).fill(0)
 
-    // Query for vectors with matching ID prefix
+    // Query for vectors (no filter)
     const queryResponse = await index.query({
       topK: 1000,
       includeMetadata: true,
-      filter: {
-        id: { $startsWith: id },
-      },
       vector: zeroVector,
     })
 
-    // Extract vector IDs to delete
-    const vectorIds = queryResponse.matches?.map((match) => match.id) || []
+    // Extract vector IDs to delete by prefix
+    const vectorIds = (queryResponse.matches || [])
+      .filter((match) => match.id.startsWith(id))
+      .map((match) => match.id)
 
     if (vectorIds.length === 0) {
       return NextResponse.json({ error: "No vectors found for this file ID" }, { status: 404 })
