@@ -1,137 +1,55 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getPineconeIndex } from "@/lib/pinecone-client"
+import { NextRequest, NextResponse } from "next/server"
+import { OpenAI } from "openai"
 
 export async function GET(req: NextRequest) {
   try {
-    // Check if Pinecone API key is set
-    if (!process.env.PINECONE_API_KEY) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Pinecone API key is not configured",
-        },
-        { status: 500 },
-      )
+    const openaiApiKey = process.env.OPENAI_API_KEY
+    const assistantId = process.env.OPENAI_ASSISTANT_ID
+    if (!openaiApiKey || !assistantId) {
+      return NextResponse.json({ success: false, files: [], error: "Missing OpenAI API key or Assistant ID" }, { status: 400 })
     }
-
-    // Try to get the Pinecone index
-    let index
-    try {
-      index = await getPineconeIndex()
-    } catch (error: any) {
-      console.error("Error connecting to Pinecone:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to connect to Pinecone",
-          details: error.message,
-        },
-        { status: 500 },
-      )
-    }
-
-    // Fetch stats to get a count of vectors
-    let stats
-    try {
-      stats = await index.describeIndexStats()
-    } catch (error: any) {
-      console.error("Error fetching Pinecone stats:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to fetch Pinecone stats",
-          details: error.message,
-        },
-        { status: 500 },
-      )
-    }
-
-    // Get the dimension of the index
-    const indexDimension = stats.dimension || 1024
-
-    // In a real implementation, we would store metadata about uploaded files
-    // in a database. For this example, we'll try to extract unique sources from metadata
-    const namespaces = stats.namespaces || {}
-    const defaultNamespace = namespaces[""] || { vectorCount: 0 }
-
-    // If there are no vectors, return empty array
-    if (defaultNamespace.vectorCount === 0) {
-      return NextResponse.json({
-        success: true,
-        files: [],
-        stats: {
-          totalVectors: 0,
-          dimensions: indexDimension,
-        },
-      })
-    }
-
-    // Create a zero vector with the correct dimension
-    const zeroVector = new Array(indexDimension).fill(0)
-
-    // Query for some vectors to extract metadata
-    let queryResponse
-    try {
-      queryResponse = await index.query({
-        topK: 100,
-        includeMetadata: true,
-        vector: zeroVector,
-      })
-    } catch (error: any) {
-      console.error("Error querying Pinecone:", error)
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to query Pinecone",
-          details: error.message,
-        },
-        { status: 500 },
-      )
-    }
-
-    // Extract unique file sources from metadata
-    const uniqueFiles = new Map()
-
-    if (queryResponse.matches) {
-      queryResponse.matches.forEach((match) => {
-        if (match.metadata && match.metadata.source && match.metadata.id) {
-          const fileId = match.metadata.id.split("-chunk-")[0]
-
-          if (!uniqueFiles.has(fileId)) {
-            uniqueFiles.set(fileId, {
-              id: fileId,
-              name: match.metadata.source,
-              date: match.metadata.uploadDate || new Date().toISOString(),
-              size: match.metadata.size ? `${Math.round(match.metadata.size / 1024)} KB` : "Unknown",
-              vectors: 1,
-            })
-          } else {
-            const file = uniqueFiles.get(fileId)
-            file.vectors += 1
-          }
+    const openai = new OpenAI({ apiKey: openaiApiKey })
+    // Get the assistant
+    const assistant = await openai.beta.assistants.retrieve(assistantId)
+    // Get the vector store IDs
+    const vectorStoreIds = assistant.tool_resources?.file_search?.vector_store_ids || []
+    let attachedFiles: any[] = []
+    for (const vectorStoreId of vectorStoreIds) {
+      let after: string | undefined = undefined
+      let keepGoing = true
+      while (keepGoing) {
+        const url = new URL(`https://api.openai.com/v1/vector_stores/${vectorStoreId}/files`)
+        url.searchParams.set("limit", "100")
+        if (after) url.searchParams.set("after", after)
+        const res = await fetch(url.toString(), {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${openaiApiKey}` }
+        })
+        if (!res.ok) break
+        const data = await res.json()
+        if (data.data && Array.isArray(data.data)) {
+          attachedFiles.push(...data.data)
         }
-      })
+        if (data.has_more && data.data.length > 0) {
+          after = data.data[data.data.length - 1].id
+        } else {
+          keepGoing = false
+        }
+      }
     }
-
-    const files = Array.from(uniqueFiles.values())
-
-    return NextResponse.json({
-      success: true,
-      files,
-      stats: {
-        totalVectors: stats.totalVectorCount,
-        dimensions: indexDimension,
-      },
+    // Get metadata for each file
+    const allFiles = await openai.files.list()
+    const filesWithMeta = attachedFiles.map((file) => {
+      const meta = allFiles.data.find((f) => f.id === file.id)
+      return {
+        id: file.id,
+        filename: meta?.filename || file.id,
+        size: meta ? `${(meta.bytes / 1024).toFixed(2)} KB` : "-",
+        created_at: meta ? new Date(meta.created_at * 1000).toLocaleDateString() : "-",
+      }
     })
+    return NextResponse.json({ success: true, files: filesWithMeta, error: null })
   } catch (error: any) {
-    console.error("Error listing knowledge base:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to list knowledge base",
-        details: error.message,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, files: [], error: error.message }, { status: 500 })
   }
-}
+} 

@@ -32,13 +32,15 @@ export default function KnowledgeBaseItem({ id, name, date, size, onDelete }: Kn
     setIsDeleting(true)
 
     try {
-      const response = await fetch(`/api/knowledge-base/delete?id=${id}`, {
-        method: "DELETE",
+      const response = await fetch(`/api/knowledge-base/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: id }),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.details || errorData.error || `Error: ${response.status}`)
+        throw new Error(errorData.error || `Error: ${response.status}`)
       }
 
       const data = await response.json()
@@ -48,7 +50,6 @@ export default function KnowledgeBaseItem({ id, name, date, size, onDelete }: Kn
           title: "File removed",
           description: `${name} has been removed from your knowledge base.`,
         })
-
         if (onDelete) {
           onDelete()
         }

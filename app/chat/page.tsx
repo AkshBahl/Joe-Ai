@@ -18,7 +18,6 @@ import {
   Send,
   Settings,
   Loader2,
-  Database,
   Mic,
   MicOff,
   Sun,
@@ -41,7 +40,6 @@ export default function ChatPage() {
   const [vectorRatio, setVectorRatio] = useState(75)
   const [summaryLength, setSummaryLength] = useState("none")
   const [testingOpenAI, setTestingOpenAI] = useState(false)
-  const [testingPinecone, setTestingPinecone] = useState(false)
   const { toast } = useToast()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { theme, setTheme } = useTheme()
@@ -65,7 +63,7 @@ export default function ChatPage() {
       if (data.openai?.success) {
         toast({
           title: "OpenAI API Test Successful",
-          description: `OpenAI API is working. Response: "${data.openai.response}"`,
+          description: `OpenAI API is working. Assistant: ${data.openai.assistant.name} (${data.openai.assistant.model})`,
         })
       } else {
         throw new Error(data.openai?.error || "Unknown error occurred")
@@ -78,30 +76,6 @@ export default function ChatPage() {
       })
     } finally {
       setTestingOpenAI(false)
-    }
-  }
-
-  const handleTestPineconeAPI = async () => {
-    setTestingPinecone(true)
-    try {
-      const response = await fetch("/api/test-connections?type=pinecone")
-      const data = await response.json()
-      if (data.pinecone?.success) {
-        toast({
-          title: "Pinecone API Test Successful",
-          description: `Pinecone API is working. Available indexes: ${data.pinecone.indexes.join(", ") || "none"}`,
-        })
-      } else {
-        throw new Error(data.pinecone?.error || "Unknown error occurred")
-      }
-    } catch (error: any) {
-      toast({
-        title: "Pinecone API Test Failed",
-        description: error.message || "Unknown error occurred",
-        variant: "destructive",
-      })
-    } finally {
-      setTestingPinecone(false)
     }
   }
 
@@ -142,33 +116,17 @@ export default function ChatPage() {
       {/* Right Panel - Chat UI */}
       <div className="w-1/2 flex flex-col p-4 overflow-hidden bg-background text-foreground">
         <div className="flex items-center justify-between mb-4">
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleTestOpenAIAPI}
-              disabled={testingOpenAI}
-              className="text-foreground bg-muted"
-            >
-              {testingOpenAI ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Test OpenAI
-            </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleTestOpenAIAPI}
+            disabled={testingOpenAI}
+            className="text-foreground bg-muted"
+          >
+            {testingOpenAI ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Test OpenAI
+          </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleTestPineconeAPI}
-              disabled={testingPinecone}
-              className="text-foreground bg-muted"
-            >
-              {testingPinecone ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Database className="h-4 w-4 mr-2" />
-              )}
-              Test Pinecone
-            </Button>
-          </div>
           <div className="flex gap-2 items-center">
             {/* Theme toggle button */}
             <Button
@@ -192,19 +150,6 @@ export default function ChatPage() {
                   <SheetDescription>Customize how your AI assistant responds</SheetDescription>
                 </SheetHeader>
                 <div className="py-4 space-y-6">
-                  <div className="space-y-2">
-                    <Label>
-                      Vector vs Web Search: {vectorRatio}% / {100 - vectorRatio}%
-                    </Label>
-                    <Slider
-                      value={[vectorRatio]}
-                      onValueChange={(value) => setVectorRatio(value[0])}
-                      min={0}
-                      max={100}
-                      step={5}
-                    />
-                  </div>
-
                   <div className="space-y-2">
                     <Label>Summary Length</Label>
                     <Select value={summaryLength} onValueChange={setSummaryLength}>

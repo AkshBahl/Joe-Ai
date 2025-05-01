@@ -1,59 +1,42 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getPineconeIndex } from "@/lib/pinecone-client"
+import { NextRequest, NextResponse } from "next/server"
+import { OpenAI } from "openai"
 
-export async function DELETE(req: NextRequest) {
+export const runtime = "edge"
+
+export async function POST(req: NextRequest) {
   try {
-    const id = req.nextUrl.searchParams.get("id")
-
-    if (!id) {
-      return NextResponse.json({ error: "No file ID provided" }, { status: 400 })
+    const openaiApiKey = process.env.OPENAI_API_KEY
+    const assistantId = process.env.OPENAI_ASSISTANT_ID
+    if (!openaiApiKey || !assistantId) {
+      return NextResponse.json({ success: false, error: "Missing OpenAI API key or Assistant ID" }, { status: 400 })
     }
-
-    const index = await getPineconeIndex()
-
-    // Get the dimension of the index
-    const indexStats = await index.describeIndexStats()
-    const indexDimension = indexStats.dimension || 1024
-
-    // Create a zero vector with the correct dimension
-    const zeroVector = new Array(indexDimension).fill(0)
-
-    // Query for vectors (no filter)
-    const queryResponse = await index.query({
-      topK: 1000,
-      includeMetadata: true,
-      vector: zeroVector,
+    const openai = new OpenAI({ apiKey: openaiApiKey })
+    const { file_id } = await req.json()
+    if (!file_id) {
+      return NextResponse.json({ success: false, error: "No file_id provided" }, { status: 400 })
+    }
+    // Get the assistant to find the vector store ID
+    const assistant = await openai.beta.assistants.retrieve(assistantId)
+    const vectorStoreIds = assistant.tool_resources?.file_search?.vector_store_ids
+    if (!vectorStoreIds || !vectorStoreIds.length) {
+      return NextResponse.json({ success: false, error: "No vector store attached to assistant" }, { status: 400 })
+    }
+    const vectorStoreId = vectorStoreIds[0]
+    // Remove file from vector store using fetch
+    const detachRes = await fetch(`https://api.openai.com/v1/vector_stores/${vectorStoreId}/files/${file_id}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${openaiApiKey}`
+      }
     })
-
-    // Extract vector IDs to delete by prefix
-    const vectorIds = (queryResponse.matches || [])
-      .filter((match) => match.id.startsWith(id))
-      .map((match) => match.id)
-
-    if (vectorIds.length === 0) {
-      return NextResponse.json({ error: "No vectors found for this file ID" }, { status: 404 })
+    if (!detachRes.ok) {
+      const errorText = await detachRes.text()
+      return NextResponse.json({ success: false, error: `Failed to detach file: ${errorText}` }, { status: 500 })
     }
-
-    // Delete vectors in batches
-    const batchSize = 100
-    for (let i = 0; i < vectorIds.length; i += batchSize) {
-      const batch = vectorIds.slice(i, i + batchSize)
-      await index.deleteMany(batch)
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: `File with ID ${id} removed from knowledge base`,
-      deletedVectors: vectorIds.length,
-    })
+    // Delete file from OpenAI storage
+    await openai.files.del(file_id)
+    return NextResponse.json({ success: true, error: null })
   } catch (error: any) {
-    console.error("Error deleting file:", error)
-    return NextResponse.json(
-      {
-        error: "Failed to delete file",
-        details: error.message,
-      },
-      { status: 500 },
-    )
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }
-}
+} 

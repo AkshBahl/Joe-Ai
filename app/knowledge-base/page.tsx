@@ -21,10 +21,9 @@ type FileItem = {
 
 type KnowledgeBaseFile = {
   id: string
-  name: string
-  date: string
+  filename: string
+  created_at: string
   size: string
-  vectors: number
 }
 
 export default function KnowledgeBasePage() {
@@ -35,6 +34,8 @@ export default function KnowledgeBasePage() {
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [search, setSearch] = useState("")
+  const [sortAsc, setSortAsc] = useState(true)
 
   useEffect(() => {
     fetchKnowledgeBase()
@@ -134,16 +135,12 @@ export default function KnowledgeBasePage() {
 
   const handleUpload = async () => {
     setIsUploading(true)
-
     try {
-      // Refresh knowledge base
       await fetchKnowledgeBase()
-
       toast({
         title: "Knowledge base updated",
         description: `${files.length} files have been processed and added to your knowledge base.`,
       })
-
       setFiles([])
     } catch (error: any) {
       console.error("Error updating knowledge base:", error)
@@ -161,48 +158,56 @@ export default function KnowledgeBasePage() {
     setFiles((prev) => prev.filter((file) => file.id !== id))
   }
 
+  const filteredFiles = knowledgeBaseFiles
+    .filter((file) => file.filename.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) =>
+      sortAsc ? a.filename.localeCompare(b.filename) : b.filename.localeCompare(a.filename)
+    )
+
   const renderKnowledgeBaseContent = () => {
-    if (isLoading) {
-      return (
-        <div className="flex justify-center items-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      )
-    }
-
-    if (error) {
-      return (
-        <div className="text-center py-8">
-          <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto mb-2" />
-          <p className="text-muted-foreground mb-2">Error loading knowledge base</p>
-          <p className="text-sm text-red-500 mb-4">{error}</p>
-          <Button onClick={fetchKnowledgeBase} variant="outline" size="sm">
-            Try Again
-          </Button>
-        </div>
-      )
-    }
-
-    if (knowledgeBaseFiles.length === 0) {
-      return (
-        <div className="text-center py-8">
-          <p className="text-muted-foreground">No files in knowledge base. Upload some files to get started.</p>
-        </div>
-      )
-    }
-
     return (
       <div className="space-y-4">
-        {knowledgeBaseFiles.map((file) => (
-          <KnowledgeBaseItem
-            key={file.id}
-            id={file.id}
-            name={file.name}
-            date={file.date}
-            size={file.size}
-            onDelete={fetchKnowledgeBase}
+        <div className="flex items-center gap-2 mb-4">
+          <Input
+            type="text"
+            placeholder="Search files..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-xs"
           />
-        ))}
+          <Button variant="outline" size="sm" onClick={() => setSortAsc((s) => !s)}>
+            Sort {sortAsc ? "A-Z" : "Z-A"}
+          </Button>
+        </div>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <AlertTriangle className="h-8 w-8 text-amber-500 mx-auto mb-2" />
+            <p className="text-muted-foreground mb-2">Error loading knowledge base</p>
+            <p className="text-sm text-red-500 mb-4">{error}</p>
+            <Button onClick={fetchKnowledgeBase} variant="outline" size="sm">
+              Try Again
+            </Button>
+          </div>
+        ) : filteredFiles.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No files in knowledge base. Upload some files to get started.</p>
+          </div>
+        ) : (
+          filteredFiles.map((file) => (
+            <KnowledgeBaseItem
+              key={file.id}
+              id={file.id}
+              name={file.filename}
+              date={file.created_at}
+              size={file.size}
+              onDelete={fetchKnowledgeBase}
+            />
+          ))
+        )}
       </div>
     )
   }
