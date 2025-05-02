@@ -103,124 +103,94 @@ export default function ChatPage() {
   const stopListening = () => setIsListening(false)
 
   return (
-    <div className="flex h-screen w-screen bg-background text-foreground">
-      {/* Left Panel - Image */}
-      <div className="w-3/4 flex items-center justify-center bg-background">
-        <img
-          src="/joe-avatar.png"
-          alt="Joe Avatar"
-          className="w-full h-full object-contain"
-        />
-      </div>
-
-      {/* Right Panel - Chat UI */}
-      <div className="w-1/2 flex flex-col p-4 overflow-hidden bg-background text-foreground">
-        <div className="flex items-center justify-between mb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleTestOpenAIAPI}
-            disabled={testingOpenAI}
-            className="text-foreground bg-muted"
-          >
-            {testingOpenAI ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-            Test OpenAI
-          </Button>
-
-          <div className="flex gap-2 items-center">
-            {/* Theme toggle button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="text-foreground bg-muted"
-            >
-              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
-            {/* Settings button */}
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-foreground bg-muted">
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent className="bg-background text-foreground">
-                <SheetHeader>
-                  <SheetTitle>Chat Settings</SheetTitle>
-                  <SheetDescription>Customize how your AI assistant responds</SheetDescription>
-                </SheetHeader>
-                <div className="py-4 space-y-6">
-                  <div className="space-y-2">
-                    <Label>Summary Length</Label>
-                    <Select value={summaryLength} onValueChange={setSummaryLength}>
-                      <SelectTrigger className="bg-background text-foreground">
-                        <SelectValue placeholder="No summarization" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-background text-foreground">
-                        <SelectItem value="none">No summarization</SelectItem>
-                        <SelectItem value="100">100 words</SelectItem>
-                        <SelectItem value="200">200 words</SelectItem>
-                        <SelectItem value="300">300 words</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+    <div className="flex flex-col h-screen w-screen bg-background text-foreground">
+      {/* Navigation Bar */}
+      <nav className="w-full flex items-center justify-between px-4 py-2 sm:px-8 sm:py-4 border-b border-gray-300 dark:border-gray-700 bg-background">
+        <div className="flex items-center">
+          <img
+            src="/dark.webp"
+            alt="Logo"
+            className="h-8 w-auto sm:h-10 max-w-[120px] object-contain mr-2"
+            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.08))' }}
+          />
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="text-foreground bg-muted"
+        >
+          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
+      </nav>
+      <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+        {/* Left Panel - Image */}
+        <div className="w-full md:w-3/4 flex items-center justify-center bg-background h-48 sm:h-64 md:h-full min-h-[180px] max-h-[400px] md:max-h-none">
+          <img
+            src="/joe-avatar.png"
+            alt="Joe Avatar"
+            className="w-full h-full object-contain rounded-lg"
+          />
         </div>
 
-        <Card className="flex-1 overflow-hidden flex flex-col border border-gray-300 dark:border-gray-700 bg-background text-foreground">
-          <CardContent className="flex-1 overflow-y-auto p-2 space-y-4">
-            {messages.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-center px-4">
-                <div className="max-w-sm space-y-2">
-                  <h3 className="text-sm font-medium">Welcome to Joe AI</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Start chatting with your assistant powered by your custom knowledge base.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                {messages.map((message) => (
-                  <ChatMessage key={message.id} message={message} />
-                ))}
-                <div ref={messagesEndRef} />
-              </>
-            )}
-          </CardContent>
-
-          <div className="p-2 border-t border-gray-300 dark:border-gray-700 bg-background">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
-              {/* Mic button for speech-to-text */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={isListening ? stopListening : startListening}
-                className="text-foreground bg-muted"
-              >
-                {isListening ? <MicOff className="h-5 w-5 animate-pulse" /> : <Mic className="h-5 w-5" />}
-              </Button>
-              <Input
-                value={input}
-                onChange={handleInputChange}
-                placeholder="Type your message..."
-                disabled={isLoading}
-                className="flex-1 text-xs text-foreground border border-gray-300 dark:border-gray-700 placeholder-muted-foreground bg-background"
-              />
-              <Button
-                type="submit"
-                disabled={isLoading || !input.trim()}
-                size="sm"
-                className="text-background bg-foreground"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </Button>
-            </form>
+        {/* Right Panel - Chat UI */}
+        <div className="w-full md:w-1/2 flex flex-col p-2 sm:p-4 overflow-hidden bg-background text-foreground h-full">
+          <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-2">
+            {/* (Other controls can go here if needed) */}
           </div>
-        </Card>
+
+          <Card className="flex-1 overflow-hidden flex flex-col border border-gray-300 dark:border-gray-700 bg-background text-foreground">
+            <CardContent className="flex-1 overflow-y-auto p-2 space-y-4">
+              {messages.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-center px-4">
+                  <div className="max-w-sm space-y-2">
+                    <h3 className="text-sm font-medium">Welcome to Joe AI</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Start chatting with your assistant powered by your custom knowledge base.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {messages.map((message) => (
+                    <ChatMessage key={message.id} message={message} />
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
+            </CardContent>
+
+            <div className="p-2 border-t border-gray-300 dark:border-gray-700 bg-background">
+              <form onSubmit={handleSendMessage} className="flex items-center gap-2 w-full">
+                <Input
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder="Type your message..."
+                  disabled={isLoading}
+                  className="flex-1 text-xs text-foreground border border-gray-300 dark:border-gray-700 placeholder-muted-foreground bg-background"
+                />
+                <Button
+                  type="submit"
+                  disabled={isLoading || !input.trim()}
+                  size="sm"
+                  className="text-background bg-foreground"
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={isListening ? stopListening : startListening}
+                  className="text-foreground bg-muted"
+                  title={isListening ? "Stop voice typing" : "Start voice typing"}
+                >
+                  <Mic className={`h-5 w-5 ${isListening ? 'animate-pulse text-green-500' : ''}`} />
+                </Button>
+              </form>
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   )

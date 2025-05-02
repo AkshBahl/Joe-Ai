@@ -86,7 +86,7 @@ export default function ChatMessage({ message, onVoiceInput }: ChatMessageProps)
 
         <div className="flex-1">
           <div className="font-medium mb-1">
-            {isUser ? "You" : "AI Assistant"}
+            {isUser ? "You" : "Joseph Malchar"}
           </div>
 
           <div className="text-sm">

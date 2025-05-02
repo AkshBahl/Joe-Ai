@@ -36,6 +36,7 @@ export default function KnowledgeBasePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [search, setSearch] = useState("")
   const [sortAsc, setSortAsc] = useState(true)
+  const [activeTab, setActiveTab] = useState<'transcripts' | 'literature'>('transcripts')
 
   useEffect(() => {
     fetchKnowledgeBase()
@@ -158,7 +159,20 @@ export default function KnowledgeBasePage() {
     setFiles((prev) => prev.filter((file) => file.id !== id))
   }
 
-  const filteredFiles = knowledgeBaseFiles
+  const transcripts = knowledgeBaseFiles.filter(
+    (file) =>
+      file.filename.toLowerCase().startsWith('day') ||
+      file.filename.toLowerCase().includes('transcript')
+  )
+  const literature = knowledgeBaseFiles.filter(
+    (file) =>
+      !(
+        file.filename.toLowerCase().startsWith('day') ||
+        file.filename.toLowerCase().includes('transcript')
+      )
+  )
+
+  const filesToShow = (activeTab === 'transcripts' ? transcripts : literature)
     .filter((file) => file.filename.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) =>
       sortAsc ? a.filename.localeCompare(b.filename) : b.filename.localeCompare(a.filename)
@@ -167,13 +181,32 @@ export default function KnowledgeBasePage() {
   const renderKnowledgeBaseContent = () => {
     return (
       <div className="space-y-4">
+        <div className="flex items-center gap-4 mb-2">
+          <span className="text-sm text-muted-foreground">
+            Total files = {knowledgeBaseFiles.length} file{knowledgeBaseFiles.length !== 1 ? "s" : ""}
+          </span>
+        </div>
         <div className="flex items-center gap-2 mb-4">
+          <Button
+            variant={activeTab === 'transcripts' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('transcripts')}
+          >
+            Transcripts
+          </Button>
+          <Button
+            variant={activeTab === 'literature' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('literature')}
+          >
+            Literature
+          </Button>
           <Input
             type="text"
-            placeholder="Search files..."
+            placeholder={`Search ${activeTab}...`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="max-w-xs"
+            className="max-w-xs ml-4"
           />
           <Button variant="outline" size="sm" onClick={() => setSortAsc((s) => !s)}>
             Sort {sortAsc ? "A-Z" : "Z-A"}
@@ -192,12 +225,12 @@ export default function KnowledgeBasePage() {
               Try Again
             </Button>
           </div>
-        ) : filteredFiles.length === 0 ? (
+        ) : filesToShow.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">No files in knowledge base. Upload some files to get started.</p>
+            <p className="text-muted-foreground">No files in this section. Upload some files to get started.</p>
           </div>
         ) : (
-          filteredFiles.map((file) => (
+          filesToShow.map((file) => (
             <KnowledgeBaseItem
               key={file.id}
               id={file.id}
@@ -213,13 +246,13 @@ export default function KnowledgeBasePage() {
   }
 
   return (
-    <div className="container mx-auto py-6 px-4">
+    <div className="container mx-auto py-6 px-2 sm:px-4">
       <h1 className="text-2xl font-bold mb-6">Knowledge Base Management</h1>
 
       <Tabs defaultValue="upload">
-        <TabsList className="mb-4">
-          <TabsTrigger value="upload">Upload Files</TabsTrigger>
-          <TabsTrigger value="manage">Manage Knowledge Base</TabsTrigger>
+        <TabsList className="mb-4 flex flex-col sm:flex-row gap-2">
+          <TabsTrigger value="upload" className="flex-1">Upload Files</TabsTrigger>
+          <TabsTrigger value="manage" className="flex-1">Manage Knowledge Base</TabsTrigger>
         </TabsList>
 
         <TabsContent value="upload">
@@ -228,7 +261,7 @@ export default function KnowledgeBasePage() {
               <CardTitle>Upload Documents</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+              <div className="border-2 border-dashed rounded-lg p-4 sm:p-8 text-center">
                 <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-medium mb-2">Drag and drop files here</h3>
                 <p className="text-sm text-muted-foreground mb-4">Supported formats: TXT, CSV, JSON</p>
@@ -244,7 +277,8 @@ export default function KnowledgeBasePage() {
                 />
 
                 {/* Direct button click handler */}
-                <Button type="button" onClick={handleSelectFilesClick}>
+                <Button type="button" onClick={handleSelectFilesClick}
+                  className="w-full sm:w-auto mt-2 sm:mt-0">
                   <FileText className="h-4 w-4 mr-2" />
                   Select Files
                 </Button>
@@ -255,15 +289,15 @@ export default function KnowledgeBasePage() {
                   <h3 className="text-lg font-medium">Selected Files</h3>
                   <div className="space-y-2">
                     {files.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div key={file.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 border rounded-lg gap-2">
                         <div className="flex items-center space-x-3">
                           <FileText className="h-5 w-5 text-muted-foreground" />
                           <div>
-                            <p className="font-medium">{file.name}</p>
+                            <p className="font-medium break-all max-w-xs sm:max-w-none">{file.name}</p>
                             <p className="text-sm text-muted-foreground">{(file.size / 1024).toFixed(2)} KB</p>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 mt-2 sm:mt-0">
                           {file.status === "uploading" && (
                             <span className="text-sm text-muted-foreground flex items-center">
                               <Loader2 className="h-3 w-3 mr-1 animate-spin" /> Uploading...
@@ -305,7 +339,11 @@ export default function KnowledgeBasePage() {
                 Current Knowledge Base
               </CardTitle>
             </CardHeader>
-            <CardContent>{renderKnowledgeBaseContent()}</CardContent>
+            <CardContent>
+              <div className="overflow-x-auto">
+                {renderKnowledgeBaseContent()}
+              </div>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

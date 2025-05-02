@@ -59,7 +59,27 @@ async function getAssistantResponse(messages: any[], threadId?: string) {
 // Updated generateChatResponse to use Assistant API
 export async function generateChatResponse(messages: any[], vectorRatio = 75, summaryLength = "none") {
   try {
-    return await getAssistantResponse(messages)
+    // Detect if the last user message is a greeting
+    const greetings = ["hi", "hello", "hey"]; // Add more greetings if needed
+    const lastUserMessage = messages.filter(m => m.role === "user").pop()?.content?.toLowerCase() || "";
+    const shouldIntroduce = greetings.some(greet => lastUserMessage.startsWith(greet));
+
+    let systemPrompt = shouldIntroduce
+      ? "You are Joseph Malchar, a steel expert. Introduce yourself and greet the user."
+      : "You are Joseph Malchar, a steel expert. Do NOT introduce yourself unless the user greets you. Answer directly and concisely.";
+
+    // Add summary length instruction if set
+    if (summaryLength !== "none") {
+      systemPrompt += ` Please answer in no more than ${summaryLength} words.`;
+    }
+
+    // Pass the systemPrompt as the first message
+    const assistantMessages = [
+      { role: "system", content: systemPrompt },
+      ...messages
+    ];
+
+    return await getAssistantResponse(assistantMessages)
   } catch (error) {
     console.error("Chat error:", error)
     return "An error occurred while generating the response"
