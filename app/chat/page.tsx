@@ -34,13 +34,15 @@ import {
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { useTheme } from "next-themes"
+import StreamingAvatarComponent from "@/components/streaming-avatar"
 
 export default function ChatPage() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat()
-  const [vectorRatio, setVectorRatio] = useState(75)
-  const [summaryLength, setSummaryLength] = useState("none")
+ 
   const [testingOpenAI, setTestingOpenAI] = useState(false)
   const { toast } = useToast()
+  const avatarRef = useRef<any>(null); // to control HeyGen
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { theme, setTheme } = useTheme()
   const [isListening, setIsListening] = useState(false)
@@ -49,11 +51,20 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  const handleSendMessage = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const metadata = { vectorRatio, summaryLength }
-    handleSubmit(e, metadata)
+    const metadata = {  }
+  
+    // Submit to GPT
+    const result = await handleSubmit(e, metadata)
+  
+    // Speak last assistant message (if avatar is ready)
+    const lastAssistantMessage = messages.filter(m => m.role === "assistant").pop()
+    if (avatarRef.current && lastAssistantMessage?.content) {
+      await avatarRef.current.speak(lastAssistantMessage.content)
+    }
   }
+  
 
   const handleTestOpenAIAPI = async () => {
     setTestingOpenAI(true)
@@ -126,11 +137,11 @@ export default function ChatPage() {
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
         {/* Left Panel - Image */}
         <div className="w-full md:w-3/4 flex items-center justify-center bg-background h-48 sm:h-64 md:h-full min-h-[180px] max-h-[400px] md:max-h-none">
-          <img
-            src="/joe-avatar.png"
-            alt="Joe Avatar"
-            className="w-full h-full object-contain rounded-lg"
-          />
+     
+
+        <StreamingAvatarComponent  />
+
+
         </div>
 
         {/* Right Panel - Chat UI */}
