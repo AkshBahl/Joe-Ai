@@ -38,39 +38,55 @@ export default function ChatPage() {
     })
   }
 
-  // Effect to speak the latest assistant message when it arrives
-  useEffect(() => {
-    const speakLatestMessage = async () => {
-      // Find the last assistant message that hasn't been spoken yet
-      const assistantMessages = messages.filter((m) => m.role === "assistant" && m.content.trim() !== "")
-      const lastMessage = assistantMessages[assistantMessages.length - 1]
-
-      if (lastMessage && lastMessage.id !== lastSpokenMessageId && avatarRef.current && !isSpeaking && !isLoading) {
-        try {
-          setIsSpeaking(true)
-          setLastSpokenMessageId(lastMessage.id)
-
-          await avatarRef.current.speak({
-            text: lastMessage.content,
-            taskType: TaskType.REPEAT,
-          })
-        } catch (error) {
-          console.error("Error making avatar speak:", error)
-          toast({
-            title: "Speech Error",
-            description: "There was an error making the avatar speak.",
-            variant: "destructive",
-          })
-        } finally {
-          setIsSpeaking(false)
-        }
+  const stopCurrentSpeech = async () => {
+    if (avatarRef.current && isSpeaking) {
+      try {
+        await avatarRef.current.stopSpeaking()
+        setIsSpeaking(false)
+      } catch (error) {
+        console.error("Error stopping speech:", error)
       }
     }
+  }
 
+  // Effect to speak the latest assistant message when it arrives
+  const speakLatestMessage = async () => {
+    // Find the last assistant message
+    const assistantMessages = messages.filter((m) => m.role === "assistant" && m.content.trim() !== "")
+    const lastMessage = assistantMessages[assistantMessages.length - 1]
+
+    if (lastMessage && lastMessage.id !== lastSpokenMessageId && avatarRef.current && !isLoading) {
+      try {
+        // If already speaking, stop the current speech
+        if (isSpeaking) {
+          await stopCurrentSpeech()
+        }
+
+        setIsSpeaking(true)
+        setLastSpokenMessageId(lastMessage.id)
+
+        await avatarRef.current.speak({
+          text: lastMessage.content,
+          taskType: TaskType.REPEAT,
+        })
+      } catch (error) {
+        console.error("Error making avatar speak:", error)
+        toast({
+          title: "Speech Error",
+          description: "There was an error making the avatar speak.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsSpeaking(false)
+      }
+    }
+  }
+
+  useEffect(() => {
     if (!isLoading) {
       speakLatestMessage()
     }
-  }, [messages, isLoading, isSpeaking, lastSpokenMessageId, toast])
+  }, [messages, isLoading, lastSpokenMessageId, toast])
 
   // Speech-to-text logic
   const startListening = () => {
@@ -124,9 +140,16 @@ export default function ChatPage() {
             className="h-8 w-auto sm:h-10 max-w-[120px] object-contain mr-2"
             style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.08))" }}
           />
-         
+          <span className="font-semibold text-lg">Joe AI</span>
         </div>
-      
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="text-foreground bg-muted"
+        >
+          {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </Button>
       </nav>
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
@@ -155,7 +178,8 @@ export default function ChatPage() {
                   ))}
                   {isLoading && (
                     <div className="flex items-center space-x-2 text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg">
-                      
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>Thinking...</span>
                     </div>
                   )}
                   <div ref={messagesEndRef} />
