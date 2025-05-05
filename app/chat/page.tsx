@@ -4,113 +4,113 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Slider } from "@/components/ui/slider"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { useChat } from "@/hooks/use-chat"
 import ChatMessage from "@/components/chat-message"
-import {
-  Send,
-  Settings,
-  Loader2,
-  Mic,
-  MicOff,
-  Sun,
-  Moon,
-} from "lucide-react"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import { Label } from "@/components/ui/label"
+import { Send, Loader2, Mic, MicOff, Sun, Moon } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { useTheme } from "next-themes"
 import StreamingAvatarComponent from "@/components/streaming-avatar"
 
+// Define TaskType if not already defined in the StreamingAvatar package
+enum TaskType {
+  REPEAT = "repeat",
+}
+
 export default function ChatPage() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat()
- 
-  const [testingOpenAI, setTestingOpenAI] = useState(false)
   const { toast } = useToast()
-  const avatarRef = useRef<any>(null); // to control HeyGen
-
+  const avatarRef = useRef<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { theme, setTheme } = useTheme()
   const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [lastSpokenMessageId, setLastSpokenMessageId] = useState<string | null>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    const metadata = {  }
-  
-    // Submit to GPT
-    const result = await handleSubmit(e, metadata)
-  
-    // Speak last assistant message (if avatar is ready)
-    const lastAssistantMessage = messages.filter(m => m.role === "assistant").pop()
-    if (avatarRef.current && lastAssistantMessage?.content) {
-      await avatarRef.current.speak(lastAssistantMessage.content)
-    }
+  const handleAvatarReady = (avatarInstance: any) => {
+    avatarRef.current = avatarInstance
+    toast({
+      title: "Avatar Ready",
+      description: "The virtual assistant is now ready to interact with you.",
+    })
   }
-  
 
-  const handleTestOpenAIAPI = async () => {
-    setTestingOpenAI(true)
-    try {
-      const response = await fetch("/api/test-connections?type=openai")
-      const data = await response.json()
-      if (data.openai?.success) {
-        toast({
-          title: "OpenAI API Test Successful",
-          description: `OpenAI API is working. Assistant: ${data.openai.assistant.name} (${data.openai.assistant.model})`,
-        })
-      } else {
-        throw new Error(data.openai?.error || "Unknown error occurred")
+  // Effect to speak the latest assistant message when it arrives
+  useEffect(() => {
+    const speakLatestMessage = async () => {
+      // Find the last assistant message that hasn't been spoken yet
+      const assistantMessages = messages.filter((m) => m.role === "assistant" && m.content.trim() !== "")
+      const lastMessage = assistantMessages[assistantMessages.length - 1]
+
+      if (lastMessage && lastMessage.id !== lastSpokenMessageId && avatarRef.current && !isSpeaking && !isLoading) {
+        try {
+          setIsSpeaking(true)
+          setLastSpokenMessageId(lastMessage.id)
+
+          await avatarRef.current.speak({
+            text: lastMessage.content,
+            taskType: TaskType.REPEAT,
+          })
+        } catch (error) {
+          console.error("Error making avatar speak:", error)
+          toast({
+            title: "Speech Error",
+            description: "There was an error making the avatar speak.",
+            variant: "destructive",
+          })
+        } finally {
+          setIsSpeaking(false)
+        }
       }
-    } catch (error: any) {
-      toast({
-        title: "OpenAI API Test Failed",
-        description: error.message || "Unknown error occurred",
-        variant: "destructive",
-      })
-    } finally {
-      setTestingOpenAI(false)
     }
-  }
+
+    if (!isLoading) {
+      speakLatestMessage()
+    }
+  }, [messages, isLoading, isSpeaking, lastSpokenMessageId, toast])
 
   // Speech-to-text logic
   const startListening = () => {
-    if (!('webkitSpeechRecognition' in window)) {
-      alert('Speech recognition is not supported in this browser.')
+    if (!("webkitSpeechRecognition" in window)) {
+      toast({
+        title: "Speech Recognition Not Supported",
+        description: "Speech recognition is not supported in this browser.",
+        variant: "destructive",
+      })
       return
     }
+
     const recognition = new (window as any).webkitSpeechRecognition()
     recognition.continuous = true
     recognition.interimResults = true
+
     recognition.onstart = () => setIsListening(true)
+
     recognition.onresult = (event: any) => {
       const transcript = Array.from(event.results)
         .map((result: any) => result[0])
         .map((result: any) => result.transcript)
-        .join('')
+        .join("")
+
       handleInputChange({ target: { value: transcript } } as any)
     }
-    recognition.onerror = () => setIsListening(false)
+
+    recognition.onerror = () => {
+      setIsListening(false)
+      toast({
+        title: "Speech Recognition Error",
+        description: "An error occurred with speech recognition.",
+        variant: "destructive",
+      })
+    }
+
     recognition.onend = () => setIsListening(false)
     recognition.start()
   }
+
   const stopListening = () => setIsListening(false)
 
   return (
@@ -122,34 +122,21 @@ export default function ChatPage() {
             src="/dark.webp"
             alt="Logo"
             className="h-8 w-auto sm:h-10 max-w-[120px] object-contain mr-2"
-            style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.08))' }}
+            style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.08))" }}
           />
+         
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="text-foreground bg-muted"
-        >
-          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </Button>
+      
       </nav>
+
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-        {/* Left Panel - Image */}
-        <div className="w-full md:w-3/4 flex items-center justify-center bg-background h-48 sm:h-64 md:h-full min-h-[180px] max-h-[400px] md:max-h-none">
-     
-
-        <StreamingAvatarComponent  />
-
-
+        {/* Left Panel - Avatar */}
+        <div className="w-full md:w-1/2 flex items-center justify-center bg-background h-48 sm:h-64 md:h-full min-h-[180px] max-h-[400px] md:max-h-none p-4">
+          <StreamingAvatarComponent onReady={handleAvatarReady} isSpeaking={isSpeaking} />
         </div>
 
         {/* Right Panel - Chat UI */}
         <div className="w-full md:w-1/2 flex flex-col p-2 sm:p-4 overflow-hidden bg-background text-foreground h-full">
-          <div className="flex flex-col sm:flex-row items-center justify-between mb-4 gap-2">
-            {/* (Other controls can go here if needed) */}
-          </div>
-
           <Card className="flex-1 overflow-hidden flex flex-col border border-gray-300 dark:border-gray-700 bg-background text-foreground">
             <CardContent className="flex-1 overflow-y-auto p-2 space-y-4">
               {messages.length === 0 ? (
@@ -166,23 +153,28 @@ export default function ChatPage() {
                   {messages.map((message) => (
                     <ChatMessage key={message.id} message={message} />
                   ))}
+                  {isLoading && (
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground p-4 bg-muted/50 rounded-lg">
+                      
+                    </div>
+                  )}
                   <div ref={messagesEndRef} />
                 </>
               )}
             </CardContent>
 
             <div className="p-2 border-t border-gray-300 dark:border-gray-700 bg-background">
-              <form onSubmit={handleSendMessage} className="flex items-center gap-2 w-full">
+              <form onSubmit={handleSubmit} className="flex items-center gap-2 w-full">
                 <Input
                   value={input}
                   onChange={handleInputChange}
                   placeholder="Type your message..."
-                  disabled={isLoading}
+                  disabled={isLoading || isSpeaking}
                   className="flex-1 text-xs text-foreground border border-gray-300 dark:border-gray-700 placeholder-muted-foreground bg-background"
                 />
                 <Button
                   type="submit"
-                  disabled={isLoading || !input.trim()}
+                  disabled={isLoading || !input.trim() || isSpeaking}
                   size="sm"
                   className="text-background bg-foreground"
                 >
@@ -193,10 +185,11 @@ export default function ChatPage() {
                   variant="ghost"
                   size="icon"
                   onClick={isListening ? stopListening : startListening}
+                  disabled={isLoading || isSpeaking}
                   className="text-foreground bg-muted"
                   title={isListening ? "Stop voice typing" : "Start voice typing"}
                 >
-                  <Mic className={`h-5 w-5 ${isListening ? 'animate-pulse text-green-500' : ''}`} />
+                  {isListening ? <MicOff className="h-5 w-5 text-red-500" /> : <Mic className="h-5 w-5" />}
                 </Button>
               </form>
             </div>
